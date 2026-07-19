@@ -1,0 +1,24 @@
+Remastersys allows to remaster your system, creating a backup image or a new
+distribution that can be copied to a USB key and run as a Live CD.
+
+Usage:
+  remastersys COMMAND [OPTIONS]
+      (must run as superuser)
+
+  remastersys backup [cdfs|iso] [filename.iso]
+
+  remastersys dist [cdfs|iso] [filename.iso]
+
+  remastersys clean
+
+  remastersys install [-g, --gui]
+
+  remastersys skelcopy username
+                       clear
+
+  remastersys grub [-c, --config] /device [root|rootmbr]
+                                  /mounting/point [root|rootmbr]
+                   [-r, --restore]
+
+Manual pages:
+  Type "man remastersys" for a more in-depth help.

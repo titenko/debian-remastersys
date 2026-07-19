@@ -1,0 +1,12 @@
+#!/bin/sh
+# postrm script for remastersys
+#
+# see: dh_installdeb(1)
+
+set -e
+
+if [ -d /home/remastersys ]; then
+    rmdir --ignore-fail-on-non-empty /home/remastersys
+fi
+
+exit 0

@@ -1,0 +1,16 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Remastersys GRUB Restorer
+Name[pt_BR]=Remastersys - Restaurador do GRUB
+GenericName=Grub Restore
+GenericName[pt_BR]=Restaurador do Grub
+Comment=Restore GRUB
+Comment[pt_BR]=Restaura o GRUB
+Exec=ysudo /usr/bin/remastersys-grub-restore gui
+Icon=/usr/share/icons/hicolor/128x128/apps/remastersys.png
+Terminal=false
+MultipleArgs=false
+Type=Application
+Categories=GTK;System
+NotShowIn=KDE
+X-KDE-SubstituteUID=true

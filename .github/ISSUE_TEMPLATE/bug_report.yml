@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a problem with Remastersys
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Remastersys targets **Debian**. Please
+        confirm your system before filing.
+  - type: input
+    id: debian
+    attributes:
+      label: Debian version
+      description: Output of `cat /etc/debian_version`
+      placeholder: "13.x (trixie)"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Command / mode
+      options:
+        - remastersys backup
+        - remastersys dist
+        - remastersys dist iso
+        - remastersys clean
+        - remastersys-installer
+        - remastersys-gui
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste relevant lines from /home/remastersys/remastersys.log
+      render: shell
+  - type: input
+    id: arch
+    attributes:
+      label: Architecture
+      placeholder: amd64

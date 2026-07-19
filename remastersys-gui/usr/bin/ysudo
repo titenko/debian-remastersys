@@ -1,0 +1,29 @@
+#!/bin/bash
+###################################################################
+#  YSUDO                                                          #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2023 Daniel "Nerun" Rodrigues                  #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+###################################################################
+
+. /etc/remastersys.conf
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/ysudo.mo
+TEXTDOMAIN=ysudo
+
+auth=$"Authentication required"
+app=$"The application \"$1\" lets\nyou modify essential parts of your system."
+
+if [[ "$USER" = "$LIVEUSER" ]]; then
+    echo "$LIVEUSER" | sudo -S $*
+else
+    yad \
+        --title="$auth" --text="$app" \
+        --image="dialog-password" \
+        --entry --hide-text --borders=10 --fixed --center \
+        --timeout-indicator=left --timeout=10 2>/dev/null | sudo -S $*
+fi
+

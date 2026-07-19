@@ -1,0 +1,724 @@
+#!/bin/bash
+###################################################################
+#  REMASTERSYS                                                    #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2021-2023 Daniel "Nerun" Rodrigues             #
+#    Copyright (C) 2007-2013 Tony "Fragadelic" Brijeski           #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+#    Full copyright notice: /usr/share/doc/remastersys/copyright  #
+###################################################################
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/remastersys.mo
+TEXTDOMAIN=remastersys
+
+Superuser=$"ERROR: This script must run as superuser. Try with \"sudo\"."
+
+# LIBRARIES
+. /usr/lib/remastersys/libremastersys.sh
+. /etc/remastersys/remastersys.version
+. /etc/remastersys.conf
+
+IsRoot # libremastersys.sh
+
+SettingsIntegrityCheck # libremastersys.sh
+
+# Remastersys terminal logo
+remastersyslogo(){
+    #Clear screen
+    clear
+    vers=$"Version"
+    echo -e "$fB$fLightBlue  ___ ___ __  __   _   ___ _____ ___ ___  _____   _____ \n | _ \ __|  \/  | /_\ / __|_   _| __| _ \/ __\ \ / / __| \n |   / _|| |\/| |/ _ \\\\\__ \ | | | _||   /\__ \\\\\ V /\__ \\ \n |_|_\___|_|  |_/_/ \_\___/ |_| |___|_|_\|___/ |_| |___/ \n  $vers $VERSION $fEND";
+}
+
+if [ "$2" = "cdfs" ]; then
+    options=$" - Creating the CD File System only."
+elif [ "$2" = "iso" ]; then
+    options=$" - Creating the ISO file only."
+elif [ "$2" = "" ]; then
+    options=""
+else  # In this case $2 work as $3 (CUSTOMISO)
+    if [ "${2: -4}" != ".iso" ]; then
+        CUSTOMISO="$2.iso"
+    else
+        CUSTOMISO="$2"
+    fi
+fi
+
+if [ "$3" != "" ]; then
+    if [ ${3: -4} != ".iso" ]; then
+        CUSTOMISO="$3.iso"
+    else
+        CUSTOMISO="$3"
+    fi
+fi
+
+case $1 in
+
+    backup)
+        remastersyslogo
+        echo -e $"$fB$fOrange\n>> BACKUP MODE SELECTED$options\n$fEND"
+    ;;
+
+    clean)
+        remastersyslogo
+        echo -e $"$fB$fOrange\n>> CLEANING MODE SELECTED\n$fEND"
+        echo $"Deleting work directory..."
+        rm -rf $WORKDIR
+        echo -e $"Done. Exiting...\n"
+        exit 0
+    ;;
+
+    dist)
+        remastersyslogo
+        echo -e $"$fB$fOrange\n>> DIST MODE SELECTED$options\n$fEND"
+    ;;
+
+    install)
+        exec remastersys-installer "$2"
+    ;;
+
+    skelcopy)
+        exec sudo remastersys-skelcopy "$2"
+    ;;
+
+    grub)
+        if [[ "$2" == @("-c"|"--config") ]]; then
+            exec remastersys-grubconfig "$3" "$4"
+        elif [[ "$2" == @("-r"|"--restore") ]]; then
+            exec remastersys-grub-restore
+        else
+            echo -e $"$fB$fRed\nERROR: no such option \"$2\" for command \"grub\".\n$fEND"
+        fi
+    ;;
+
+    *)
+        GiveUserHelp # libremastersys.sh
+    ;;
+
+esac
+
+# Function log_msg extracted from PinguyBuilder v5.2 with a few changes.
+# https://sourceforge.net/projects/pinguy-os/files/ISO_Builder/
+# Added log_msg to reduce size. Code provided by Ivailo (a.k.a. SmiL3y)
+log_msg() {
+    echo -e "$1" >> $WORKDIR/remastersys.log
+}
+
+cdfs(){
+
+    # STEP 1 - Create the CD tree in $WORKDIR/ISOTMP
+
+    echo $"Checking if the $WORKDIR folder has already been created."
+    if [ -d "$WORKDIR" ]; then
+        rm -rf $WORKDIR/dummysys/var/*
+        rm -rf $WORKDIR/dummysys/etc/*
+    else
+        mkdir -p $WORKDIR/ISOTMP/live
+        mkdir -p $WORKDIR/ISOTMP/install
+        mkdir -p $WORKDIR/ISOTMP/preseed
+        mkdir -p $WORKDIR/dummysys/dev
+        mkdir -p $WORKDIR/dummysys/etc/live
+        mkdir -p $WORKDIR/dummysys/proc
+        mkdir -p $WORKDIR/dummysys/tmp
+        mkdir -p $WORKDIR/dummysys/sys
+        mkdir -p $WORKDIR/dummysys/mnt
+        mkdir -p $WORKDIR/dummysys/media
+        mkdir -p $WORKDIR/dummysys/run
+        mkdir -p $WORKDIR/dummysys/var
+        chmod ug+rwx,o+rwt $WORKDIR/dummysys/tmp
+    fi
+
+    echo -e $"\nCopying /var and /etc to temporary area and deleting extra files."
+
+    if [ "$EXCLUDES" != "" ]; then
+        for addvar in $EXCLUDES ; do
+            VAREXCLUDES="$VAREXCLUDES --exclude='$addvar' "
+        done
+    fi
+
+    # if KDE, copy the adept_notifier_auto.desktop to /etc/remastersys so
+    # the installer can put it back as live-initramfs removes it altogether
+    if [ -f /usr/share/autostart/adept_notifier_auto.desktop ]; then
+        cp /usr/share/autostart/adept_notifier_auto.desktop /etc/remastersys/
+    fi
+
+    # copy trackerd stuff as live-initramfs disables it
+    if [ -f /etc/xdg/autostart/tracker-applet.desktop ]; then
+        cp /etc/xdg/autostart/tracker-applet.desktop /etc/remastersys
+    fi
+
+    if [ -f /etc/xdg/autostart/trackerd.desktop ]; then
+        cp /etc/xdg/autostart/trackerd.desktop.xdg /etc/remastersys
+    fi
+
+    if [ -f /usr/share/autostart/trackerd.desktop ]; then
+        cp /usr/share/autostart/trackerd.desktop.share /etc/remastersys
+    fi
+
+    #cleanup leftover live script if it exists
+    if [ -f /etc/profile.d/zz-live.sh ]; then
+        rm -f /etc/profile.d/zz-live.sh
+    fi
+
+    rsync --exclude='*.log.*' --exclude='*.pid' --exclude='*.bak' --exclude='*.[0-9].gz' --exclude='*.deb' $VAREXCLUDES-a /var/. $WORKDIR/dummysys/var/.
+    rsync $VAREXCLUDES-a /etc/. $WORKDIR/dummysys/etc/.
+
+    if [ "$1" = "dist" ]; then
+        rm -f $WORKDIR/dummysys/etc/X11/xorg.conf
+        rm -f $WORKDIR/dummysys/etc/resolv.conf
+        rm -f $WORKDIR/dummysys/etc/hosts
+        rm -f $WORKDIR/dummysys/etc/hostname
+    fi
+
+    rm -f $WORKDIR/dummysys/etc/mtab
+    rm -f $WORKDIR/dummysys/etc/fstab
+    rm -f $WORKDIR/dummysys/etc/udev/rules.d/70-persistent*
+    ls $WORKDIR/dummysys/var/lib/apt/lists | grep -v ".gpg" | grep -v "lock" | grep -v "partial" | grep -v "auxfiles" | xargs -i rm $WORKDIR/dummysys/var/lib/apt/lists/{} ;
+
+    if [ "$1" = "dist" ]; then
+        # fix for autologin not working on Live CD when using gdm and gdm3
+        if [ -f $WORKDIR/dummysys/etc/gdm/gdm.conf ]; then
+            sed -i -e '/^AutomaticLogin/d' $WORKDIR/dummysys/etc/gdm/gdm.conf
+            # deleting contiguous empty lines
+            cat -s $WORKDIR/dummysys/etc/gdm/gdm.conf > $WORKDIR/dummysys/etc/gdm/gdm.tmp
+            cat $WORKDIR/dummysys/etc/gdm/gdm.tmp > $WORKDIR/dummysys/etc/gdm/gdm.conf
+            rm -f $WORKDIR/dummysys/etc/gdm/gdm.tmp
+        fi
+
+        if [ -f $WORKDIR/dummysys/etc/gdm3/daemon.conf ]; then
+            sed -i -e '/^AutomaticLogin/d' $WORKDIR/dummysys/etc/gdm3/daemon.conf
+            # deleting contiguous empty lines
+            cat -s $WORKDIR/dummysys/etc/gdm3/daemon.conf > $WORKDIR/dummysys/etc/gdm3/daemon.tmp
+            cat $WORKDIR/dummysys/etc/gdm3/daemon.tmp > $WORKDIR/dummysys/etc/gdm3/daemon.conf
+            rm -f $WORKDIR/dummysys/etc/gdm3/daemon.tmp
+        fi
+
+        if [ -f $WORKDIR/dummysys/etc/lightdm/lightdm.conf ]; then
+            sed -i -e "s/^autologin-user=.*/autologin-user=$LIVEUSER/g" $WORKDIR/dummysys/etc/lightdm/lightdm.conf
+        fi
+
+        if [ -f $WORKDIR/dummysys/etc/gdm/gdm.conf-custom ]; then
+            echo "  " > $WORKDIR/dummysys/etc/gdm/gdm.conf-custom
+        fi
+
+        if [[ -f /etc/X11/default-display-manager && -f /usr/share/applications/remastersys-installer.desktop && -f /usr/share/applications/remastersys-installer-kde.desktop ]]; then
+            if [ "$SHOWICON" = "1" ]; then
+                echo -e $"\nCopying installation icon to the Live CD user desktop."
+                if [ ! -d $WORKDIR/dummysys/etc/skel/Desktop ]; then
+                    mkdir -p $WORKDIR/dummysys/etc/skel/Desktop
+                fi
+
+                if [ "$(grep kdm /etc/X11/default-display-manager)" = "" ]; then
+                    cp /usr/share/applications/remastersys-installer.desktop $WORKDIR/dummysys/etc/skel/Desktop/
+                    chmod +x $WORKDIR/dummysys/etc/skel/Desktop/remastersys-installer.desktop
+                else
+                    cp /usr/share/applications/remastersys-installer-kde.desktop $WORKDIR/dummysys/etc/skel/Desktop/
+                    chmod +x $WORKDIR/dummysys/etc/skel/Desktop/remastersys-installer-kde.desktop
+                fi
+            fi
+        fi
+
+        rm -f $WORKDIR/dummysys/etc/group
+        rm -f $WORKDIR/dummysys/etc/group-
+        rm -f $WORKDIR/dummysys/etc/passwd
+        rm -f $WORKDIR/dummysys/etc/passwd-
+        rm -f $WORKDIR/dummysys/etc/shadow
+        rm -f $WORKDIR/dummysys/etc/shadow-
+        rm -f $WORKDIR/dummysys/etc/gshadow
+        rm -f $WORKDIR/dummysys/etc/gshadow-
+        rm -f $WORKDIR/dummysys/etc/wicd/wired-settings.conf
+        rm -f $WORKDIR/dummysys/etc/wicd/wireless-settings.conf
+        rm -rf $WORKDIR/dummysys/etc/NetworkManager/system-connections/*
+        rm -f $WORKDIR/dummysys/etc/printcap
+        rm -f $WORKDIR/dummysys/etc/cups/printers.conf
+        rm -rf $WORKDIR/dummysys/var/cache/gdm/*
+        rm -rf $WORKDIR/dummysys/var/lib/sudo/*
+        rm -rf $WORKDIR/dummysys/var/run/console/*
+        rm -f $WORKDIR/dummysys/var/lib/kdm/kdmsts
+        rm -f $WORKDIR/dummysys/var/lib/AccountsService/users/*
+        rm -f $WORKDIR/dummysys/etc/gdm/gdm.conf-custom
+        rm -f $WORKDIR/dummysys/etc/gdm/custom.conf
+        rm -f $WORKDIR/dummysys/etc/cups/ssl/server.crt
+        rm -f $WORKDIR/dummysys/etc/cups/ssl/server.key
+        rm -f $WORKDIR/dummysys/etc/ssh/ssh_host_rsa_key
+        rm -f $WORKDIR/dummysys/etc/ssh/ssh_host_dsa_key.pub
+        rm -f $WORKDIR/dummysys/etc/ssh/ssh_host_dsa_key
+        rm -f $WORKDIR/dummysys/etc/ssh/ssh_host_rsa_key.pub
+
+        find $WORKDIR/dummysys/var/run $WORKDIR/dummysys/var/log $WORKDIR/dummysys/var/mail $WORKDIR/dummysys/var/spool $WORKDIR/dummysys/var/lock $WORKDIR/dummysys/var/backups $WORKDIR/dummysys/var/tmp -type f -exec rm '{}' \;
+
+        #further cleanup
+        rm -rf $WORKDIR/dummysys/var/cache/gdm/*
+        rm -rf $WORKDIR/dummysys/var/tmp/kdecache*
+        rm -rf $WORKDIR/dummysys/var/spool/gfax/*
+        rm -rf $WORKDIR/dummysys/var/run/gdm3/*
+        rm -rf $WORKDIR/dummysys/var/lib/sudo/*
+        rm -rf $WORKDIR/dummysys/var/lib/polkit-1/localauthority/10-vendor.d/10-live-cd.pkla
+
+        #fix for live scripts setup Contributed by AnthLee of SalineOS
+        rm -rf $WORKDIR/dummysys/var/lib/live/config/*
+
+        for i in dpkg.log lastlog mail.log syslog auth.log daemon.log faillog lpr.log mail.warn user.log boot debug mail.err messages wtmp bootstrap.log dmesg kern.log mail.info
+        do
+            touch $WORKDIR/dummysys/var/log/${i}
+        done
+
+        # remove the non system users on the passwd and group files and copy them to dummysys
+        # see if any temp users left over from previous versions of remastersys as the process has now changed
+
+        grep '^[^:]*:[^:]*:[5-9][0-9][0-9]:' /etc/passwd | awk -F ":" '{print "/usr/sbin/userdel -f",$1}'> $WORKDIR/cleantmpusers
+        . $WORKDIR/cleantmpusers
+
+        grep '^[^:]*:[^:]*:[0-9]:' /etc/passwd >> $WORKDIR/dummysys/etc/passwd
+        grep '^[^:]*:[^:]*:[0-9][0-9]:' /etc/passwd >> $WORKDIR/dummysys/etc/passwd
+        grep '^[^:]*:[^:]*:[0-9][0-9][0-9]:' /etc/passwd >> $WORKDIR/dummysys/etc/passwd
+        grep '^[^:]*:[^:]*:[3-9][0-9][0-9][0-9][0-9]:' /etc/passwd >> $WORKDIR/dummysys/etc/passwd
+
+        grep '^[^:]*:[^:]*:[0-9]:' /etc/group >> $WORKDIR/dummysys/etc/group
+        grep '^[^:]*:[^:]*:[0-9][0-9]:' /etc/group >> $WORKDIR/dummysys/etc/group
+        grep '^[^:]*:[^:]*:[0-9][0-9][0-9]:' /etc/group >> $WORKDIR/dummysys/etc/group
+        grep '^[^:]*:[^:]*:[3-9][0-9][0-9][0-9][0-9]:' /etc/group >> $WORKDIR/dummysys/etc/group
+
+        grep '^[^:]*:[^:]*:[5-9][0-9][0-9]:' /etc/passwd | awk -F ":" '{print $1}'> $WORKDIR/tmpusers1
+        grep '^[^:]*:[^:]*:[1-9][0-9][0-9][0-9]:' /etc/passwd | awk -F ":" '{print $1}'> $WORKDIR/tmpusers2
+        grep '^[^:]*:[^:]*:[1-2][0-9][0-9][0-9][0-9]:' /etc/passwd | awk -F ":" '{print $1}'> $WORKDIR/tmpusers3
+
+        cat $WORKDIR/tmpusers1 $WORKDIR/tmpusers2 $WORKDIR/tmpusers3 > $WORKDIR/tmpusers
+
+        cat $WORKDIR/tmpusers | while read LINE ;do
+            echo $LINE | xargs -i sed -e 's/,{}//g' $WORKDIR/dummysys/etc/group > $WORKDIR/dummysys/etc/group.new1
+            echo $LINE | xargs -i sed -e 's/{},//g' $WORKDIR/dummysys/etc/group.new1 > $WORKDIR/dummysys/etc/group.new2
+            echo $LINE | xargs -i sed -e 's/{}//g' $WORKDIR/dummysys/etc/group.new2 > $WORKDIR/dummysys/etc/group
+            rm -rf $WORKDIR/dummysys/etc/group.new1 $WORKDIR/dummysys/etc/group.new2
+        done
+    fi
+
+    # copy over some of the necessary stuff for the livecd
+
+    if [ -f /etc/remastersys/preseed/*.seed ]; then
+        cp /etc/remastersys/preseed/* $WORKDIR/ISOTMP/preseed/
+    fi
+
+    # bootloader localization
+    local EnterOrTab=$"Press ENTER to choose or TAB to edit a menu entry"
+    local LiveCD=$"Live CD"
+    local LiveCDFailSafe=$"(fail safe)"
+    local ChainBoot=$"Boot from hard disk"
+    local MemTest=$"Memory Test (Memtest86)"
+    local MemTestPlus=$"Memory Test (Memtest86+)"
+
+    #BOOT Type selected is GRUB
+    if [ "$ISOBOOT" = "GRUB" ]; then
+        cp /etc/remastersys/isolinux/memtest86.bin $WORKDIR/ISOTMP/
+        cp /etc/remastersys/isolinux/memtest86+x64.bin $WORKDIR/ISOTMP/
+        mkdir -p $WORKDIR/ISOTMP/boot/grub
+        cp -a /boot/grub/* $WORKDIR/ISOTMP/boot/grub/
+        # /usr/share/grub (unicode.pf2 etc.) exists on some grub builds but
+        # not on a clean Debian trixie (there grub data lives under
+        # /usr/lib/grub and /boot/grub). Copy it only if present so the
+        # build doesn't fail, and make sure the grub.cfg loadfont target
+        # (unicode.pf2) is available inside the ISO either way.
+        if [ -d /usr/share/grub ]; then
+            mkdir -p $WORKDIR/ISOTMP/usr/share/grub
+            cp -a /usr/share/grub/* $WORKDIR/ISOTMP/usr/share/grub/ 2>/dev/null || true
+        fi
+        if [ ! -f $WORKDIR/ISOTMP/usr/share/grub/unicode.pf2 ]; then
+            for f in /boot/grub/fonts/unicode.pf2 /boot/grub/unicode.pf2 \
+                     /usr/share/grub/unicode.pf2 /usr/lib/grub/unicode.pf2; do
+                if [ -f "$f" ]; then
+                    mkdir -p $WORKDIR/ISOTMP/usr/share/grub
+                    cp -a "$f" $WORKDIR/ISOTMP/usr/share/grub/unicode.pf2
+                    break
+                fi
+            done
+        fi
+
+        # grub_eltorito.img is the El Torito BIOS boot image used by the
+        # hybrid xorriso ISO builder (trixie). Build it from the installed
+        # grub modules if the prebuilt one in /etc/remastersys is missing.
+        if [ -f /etc/remastersys/grub/grub_eltorito.img ]; then
+            cp /etc/remastersys/grub/grub_eltorito.img $WORKDIR/ISOTMP/boot/grub/
+        elif command -v grub-mkimage >/dev/null 2>&1; then
+            # -p sets the grub prefix so the El Torito image can locate
+            # /boot/grub/grub.cfg at boot time.
+            grub-mkimage -O i386-pc-eltorito -p /boot/grub \
+                -o $WORKDIR/ISOTMP/boot/grub/grub_eltorito.img \
+                biosdisk iso9660 configfile normal linux linux16 chain part_gpt \
+                part_msdos fat ext2 search search_fs_file search_fs_uuid 2>>$WORKDIR/remastersys.log
+        fi
+
+        cp /etc/remastersys/grub/grub.cfg $WORKDIR/ISOTMP/boot/grub/grub.cfg
+        cp /etc/remastersys/splash.png $WORKDIR/ISOTMP/boot/grub/grub.png
+
+        grubcfg="$WORKDIR/ISOTMP/boot/grub/grub.cfg"
+        langshort=$(locale | grep -w 'LANG' | cut -d= -f2 | cut -d. -f1) # pt_BR not pt_BR.UTF-8
+
+        # grub.cfg translation
+        sed -i -e 's/__LANGUAGE__/'"$langshort"'/g' "$grubcfg"
+        sed -i -e 's/__LIVECDLABEL__/'"$LIVECDLABEL"'/g' "$grubcfg"
+        sed -i -e 's/__LIVECDFAILSAFE__/'"$LIVECDLABEL $LiveCDFailSafe"'/g' "$grubcfg"
+        sed -i -e 's/__CHAINBOOT__/'"$ChainBoot"'/g' "$grubcfg"
+        sed -i -e 's/__MEMTEST__/'"$MemTest"'/g' "$grubcfg"
+        sed -i -e 's/__MEMTESTPLUS__/'"$MemTestPlus"'/g' "$grubcfg"
+
+        if [ ! -d /etc/plymouth ]; then
+            sed -i -e 's/splash//g' $WORKDIR/ISOTMP/boot/grub/grub.cfg
+        fi
+    #BOOT Type selected is ISOLINUX
+    else
+        mkdir -p $WORKDIR/ISOTMP/isolinux
+        cp /etc/remastersys/splash.png $WORKDIR/ISOTMP/isolinux/
+        cp /etc/remastersys/isolinux/* $WORKDIR/ISOTMP/isolinux/
+        
+        isolinuxcfg="$WORKDIR/ISOTMP/isolinux/isolinux.cfg"
+
+        # isolinux.cfg translation
+        sed -i -e 's/__LIVECDLABEL__/'"$LIVECDLABEL"'/g' "$isolinuxcfg"
+        sed -i -e 's/__ENTERORTAB__/'"$EnterOrTab"'/g' "$isolinuxcfg"
+        sed -i -e 's/__LIVECD__/'"$LiveCD"'/g' "$isolinuxcfg"
+        sed -i -e 's/__LIVECDFAILSAFE__/'"$LIVECDLABEL $LiveCDFailSafe"'/g' "$isolinuxcfg"
+        sed -i -e 's/__CHAINBOOT__/'"$ChainBoot"'/g' "$isolinuxcfg"
+        sed -i -e 's/__MEMTEST__/'"$MemTest"'/g' "$isolinuxcfg"
+        sed -i -e 's/__MEMTESTPLUS__/'"$MemTestPlus"'/g' "$isolinuxcfg"
+
+        if [ ! -d /etc/plymouth ]; then
+            sed -i -e 's/splash//g' $WORKDIR/ISOTMP/isolinux/isolinux.cfg
+        fi
+    fi
+
+    sleep 1
+
+    # STEP 2 - Prepare live.conf depending on whether this is a backup or dist
+
+    if [ "$1" = "backup" ]; then
+        LIVEUSER="$(grep '^[^:]*:[^:]*:1000:' /etc/passwd | awk -F ":" '{ print $1 }')"
+        LIVEUSER_FULL_NAME="$(getent passwd $LIVEUSER | cut -d ':' -f 5 | cut -d ',' -f 1)"
+
+        #fix Thunar volmanrc for live
+        for i in $(ls -d /home/*); do
+            if [ -f "$i/.config/Thunar/volmanrc" ]; then
+                sed -i -e 's/TRUE/FALSE/g' $i/.config/Thunar/volmanrc
+                cp -f $i/.config/volmanrc /root/.config/Thunar/volmanrc
+            fi
+        done
+    fi
+
+    if [ ! -d /etc/live ]; then
+        mkdir -p /etc/live
+    fi
+
+    # --- Modern live-config (Debian 12+/trixie) reads config from
+    #     /etc/live/config.conf.d/*.conf, NOT from /etc/live/config.conf.
+    #     Keep writing the legacy file for older systems, but ALWAYS
+    #     emit the .conf.d drop-in so trixie actually applies it. ---
+    mkdir -p /etc/live/config.conf.d
+    LIVECFG_D=/etc/live/config.conf.d/9999-remastersys.conf
+
+    cat > "$LIVECFG_D" <<EOF
+export LIVE_USERNAME="$LIVEUSER"
+export LIVE_USER_FULLNAME="$LIVEUSER_FULL_NAME"
+export LIVE_HOSTNAME="$LIVEUSER"
+export LIVE_USER_DEFAULT_GROUPS="audio,cdrom,dialout,floppy,video,plugdev,netdev,powerdev,adm,sudo"
+export LIVE_LOCALES="$(locale | grep -w 'LANG' | cut -d= -f2)"
+export LIVE_TIMEZONE="$(cat /etc/timezone 2>/dev/null)"
+EOF
+
+    # Legacy file (harmless on trixie, needed on old live-config)
+    echo "export LIVE_USERNAME=\"$LIVEUSER\"" > /etc/live/config.conf
+    echo "export LIVE_USER_FULLNAME=\"$LIVEUSER_FULL_NAME\"" >> /etc/live/config.conf
+    echo "export LIVE_HOSTNAME=\"$LIVEUSER\"" >> /etc/live/config.conf
+    echo "export LIVE_USER_DEFAULT_GROUPS=\"audio,cdrom,dialout,floppy,video,plugdev,netdev,powerdev,adm,sudo\"" >> /etc/live/config.conf
+    lang=$(locale | grep -w 'LANG' | cut -d= -f2) # like "pt_BR.UTF-8"
+    echo "export LIVE_LOCALES=\"$lang\"" >> /etc/live/config.conf
+    timezone=$(cat /etc/timezone) # like "America/Sao_Paulo"
+    echo "export LIVE_TIMEZONE=\"$timezone\"" >> /etc/live/config.conf
+
+    if [ "$1" = "backup" ]; then
+        # NOCONFIGS names updated for trixie's /usr/lib/live/config/* layout
+        echo "export LIVE_NOCONFIGS=\"user-setup,sudo,locales,locales-all,tzdata,gdm3,sddm,lightdm,lxdm,nodm,slim,xinit,keyboard-configuration,gnome-panel-data,gnome-power-manager,gnome-screensaver,kde-services,xfce4-panel,debian-installer-launcher,login\"" >> /etc/live/config.conf
+        echo "export LIVE_NOCONFIGS=\"user-setup,sudo,locales,locales-all,tzdata,gdm3,sddm,lightdm,lxdm,nodm,slim,xinit,keyboard-configuration,gnome-panel-data,gnome-power-manager,gnome-screensaver,kde-services,xfce4-panel,debian-installer-launcher,login\"" >> "$LIVECFG_D"
+    fi
+
+    #fix for a bug in the debian live boot scripts that starts a second X server
+    if [ "$1" = "dist" ] && [ -f /etc/X11/default-display-manager ]; then
+        echo "export LIVE_NOCONFIGS=\"xinit\"" >> /etc/live/config.conf
+        echo "export LIVE_NOCONFIGS=\"xinit\"" >> "$LIVECFG_D"
+    fi
+
+    cp /etc/live/config.conf $WORKDIR/dummysys/etc/live/
+    cp "$LIVECFG_D" $WORKDIR/dummysys/etc/live/config.conf.d/
+
+    sleep 1
+
+    echo -e $"\nSetting up Live CD options for mode $1."
+
+    # make a new initial ramdisk including the live scripts
+    update-initramfs -t -c -k $(uname -r)
+
+    echo -e $"\nCopying your kernel and initrd to the Live CD."
+    cp /boot/vmlinuz-$(uname -r) $WORKDIR/ISOTMP/live/vmlinuz
+    cp /boot/initrd.img-$(uname -r) $WORKDIR/ISOTMP/live/initrd.img
+
+    # STEP 3 - Make filesystem.squashfs
+
+    if [ -f $WORKDIR/remastersys.log ]; then
+        rm -f $WORKDIR/remastersys.log
+        touch $WORKDIR/remastersys.log
+    fi
+
+    if [ -f $WORKDIR/ISOTMP/live/filesystem.squashfs ]; then
+        rm -f $WORKDIR/ISOTMP/live/filesystem.squashfs
+    fi
+
+    echo -e $"\nCreating filesystem.squashfs. It will take a while, so be patient...\n"
+
+    REALFOLDERS=""
+
+    for d in $(ls -d $WORKDIR/dummysys/*); do
+        REALFOLDERS="$REALFOLDERS $d"
+    done
+    
+    if [ "$1" = "backup" ]; then
+        for d in $(ls / | grep -v etc | grep -v run | grep -v tmp | grep -v sys | grep -v var \
+| grep -v dev | grep -v media | grep -v mnt | grep -v lost+found | grep -v proc); do
+            REALFOLDERS="$REALFOLDERS /$d"
+        done
+    else
+        for d in $(ls / | grep -v etc | grep -v run | grep -v tmp | grep -v sys | grep -v var \
+| grep -v dev | grep -v media | grep -v mnt | grep -v lost+found | grep -v proc \
+| grep -v home); do
+            REALFOLDERS="$REALFOLDERS /$d"
+        done
+    fi
+
+    time mksquashfs $REALFOLDERS $WORKDIR/ISOTMP/live/filesystem.squashfs -no-duplicates $SQUASHFSOPTS -e \
+    root/.thumbnails \
+    root/.cache \
+    root/.bash_history \
+    root/.lesshst \
+    root/.nano_history \
+    boot/grub \
+    $WORKDIR $EXCLUDES 2>>$WORKDIR/remastersys.log
+
+    if [ "$1" = "backup" ]; then
+        #return Thunar volmanrc back to normal
+        for i in $(ls -d /home/*); do
+            if [ -f "$i/.config/Thunar/volmanrc" ]; then
+                sed -i -e 's/FALSE/TRUE/g' $i/.config/Thunar/volmanrc
+                cp -f $i/.config/volmanrc /root/.config/Thunar/volmanrc
+            fi
+        done
+    fi
+
+    sleep 1
+
+    #add some stuff to the log in case of problems so I can troubleshoot it easier
+    stripe="------------------------------------------------------"
+    log_msg "$stripe\nMount information:"
+    mount >> $WORKDIR/remastersys.log
+    log_msg "$stripe\ndf information:"
+    df -h 2>&1 | grep -v "df:" >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/remastersys.conf info:"
+    cat /etc/remastersys.conf >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/live/config.conf info:"
+    cat /etc/live/config.conf >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/passwd info:"
+    cat $WORKDIR/dummysys/etc/passwd >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/group info:"
+    cat $WORKDIR/dummysys/etc/group >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/skel info:"
+    find /etc/skel/ >> $WORKDIR/remastersys.log
+    log_msg "$stripe\n/etc/X11/default-display-manager info:"
+    cat /etc/X11/default-display-manager >> $WORKDIR/remastersys.log
+    log_msg "$stripe\nVersion info: $VERSION"
+    log_msg "$stripe\nCommand-line options: $@\n$stripe"
+
+    sleep 1
+}
+
+iso(){
+    # 'xorrisofs' is an alias for 'xorriso -as mkisofs'
+    # Also, 'genisoimage' is no longer updated, and 'xorriso' is the current and
+    # modern replacement.
+    # cdrtools/mkisofs is not an option: it's not availabe by default in Debian
+    # or Ubuntu repositories.
+    CREATEISO="$(find_bin 'xorriso')"
+
+    if [ -z $CREATEISO ]; then
+        CREATEISO="$(find_bin 'genisoimage')"
+    fi
+
+    # check to see if the cd filesystem exists
+    if [ ! -f "$WORKDIR/ISOTMP/live/filesystem.squashfs" ]; then
+        echo -e $"The CD file system is missing. Either there was a problem creating the compressed file system, or you are trying to run the command \"remastersys dist iso\" before \"remastersys dist cdfs\"."
+        exit 1
+    fi
+
+    # STEP 4 - Make the ISO file (hybrid BIOS + UEFI, trixie-compatible)
+    #
+    # Modern Debian live images are built with a single xorriso call that
+    # emits BOTH an El Torito BIOS boot image AND an El Torito UEFI image
+    # backed by a FAT EFI system partition. grub-mkrescue in trixie still
+    # delegates to xorriso but its legacy "-- -x ..." argument form is
+    # fragile; we drive xorriso directly for full control.
+
+    # Internationalization efforts
+    Creating=$\"Creating\"
+    In=$\"in\"
+    Using=$\"using\"
+
+    # Build a temporary FAT image holding the UEFI GRUB binary, so the ISO
+    # is bootable on UEFI-only machines (most modern hardware).
+    EFI_TMP=$(mktemp -d)
+    EFI_IMG="$EFI_TMP/efi.img"
+    # grubx64.efi lives in different spots across grub builds:
+    #   Debian trixie:        /usr/lib/grub/x86_64-efi/grubx64.efi
+    #   Ubuntu/Mint (signed): /usr/lib/grub/x86_64-efi/monolithic/grubx64.efi
+    #   signed shim:          /usr/lib/shim/shimx64.efi
+    GRUB_EFI_SRC=$(ls /usr/lib/grub/x86_64-efi/grubx64.efi \
+                       /usr/lib/grub/x86_64-efi/monolithic/grubx64.efi \
+                       /usr/lib/grub/x86_64-efi-signed/grubx64.efi \
+                       /boot/grub/x86_64-efi/grubx64.efi 2>/dev/null | head -1)
+    BOOTX64_SRC=$(ls /usr/lib/shim/shimx64.efi \
+                      /usr/lib/grub/x86_64-efi/monolithic/grubx64.efi \
+                      /usr/lib/grub/x86_64-efi/grubx64.efi 2>/dev/null | head -1)
+
+    if [ -n "$GRUB_EFI_SRC" ] && command -v mformat >/dev/null 2>&1 \
+       && command -v mmd >/dev/null 2>&1 && command -v mcopy >/dev/null 2>&1; then
+        # 64 MiB FAT image is plenty for the EFI binaries + grub.cfg
+        dd if=/dev/zero of="$EFI_IMG" bs=1M count=64 status=none
+        mkfs.vfat -n ESP "$EFI_IMG" >/dev/null 2>&1
+        mmd -i "$EFI_IMG" ::/EFI ::/EFI/BOOT 2>/dev/null
+        if [ -n "$BOOTX64_SRC" ]; then
+            mcopy -i "$EFI_IMG" "$BOOTX64_SRC" ::/EFI/BOOT/BOOTX64.EFI 2>/dev/null
+        else
+            mcopy -i "$EFI_IMG" "$GRUB_EFI_SRC" ::/EFI/BOOT/BOOTX64.EFI 2>/dev/null
+        fi
+        EFI_PRESENT=1
+        # xorriso's -boot_image efi_path=efi.img looks for /efi.img at the
+        # root of the ISO tree, i.e. inside ISOTMP. Copy it there.
+        cp "$EFI_IMG" "$WORKDIR/ISOTMP/efi.img"
+        # Also expose the EFI loader as plain files in the ISO tree
+        # (/EFI/BOOT/BOOTX64.EFI). This lets the image UEFI-boot even when
+        # it is copied file-by-file onto a FAT USB stick (e.g. Rufus in
+        # copy mode / manual extraction on Windows), not only via dd.
+        mkdir -p "$WORKDIR/ISOTMP/EFI/BOOT"
+        if [ -n "$BOOTX64_SRC" ]; then
+            cp "$BOOTX64_SRC" "$WORKDIR/ISOTMP/EFI/BOOT/BOOTX64.EFI"
+        else
+            cp "$GRUB_EFI_SRC" "$WORKDIR/ISOTMP/EFI/BOOT/BOOTX64.EFI"
+        fi
+    else
+        EFI_PRESENT=0
+        log_msg "UEFI: grub EFI binary or mtools not found -- building BIOS-only ISO"
+    fi
+
+    phrase1="$Creating $CUSTOMISO $In $WORKDIR $Using xorriso (hybrid BIOS+UEFI)."
+    echo -e "\n$phrase1"
+    log_msg "$phrase1"
+
+    # Base xorriso arguments (ISO 9660 level 3, Joliet, Rock Ridge, large files).
+    # NOTE: do NOT pass "-file_size_limit off" -- xorriso 1.5.x rejects it
+    # ("values sum up to 0"). iso_9660_level=3 in -compliance already permits
+    # files larger than 4 GiB, which is what we need for big squashfs images.
+    XORRISO_BASE="-x \
+        -rockridge on -find / -exec mkisofs_r -- \
+        -volid $LIVECDLABEL \
+        -for_backup \
+        -joliet on \
+        -compliance clear:iso_9660_level=3:only_iso_version:deep_paths:long_paths:long_names:no_j_force_dots:always_gmt:rec_mtime:old_rr:max_ce_entries=31:max_ce_drop=xattr_acl"
+
+    # El Torito BIOS boot (isolinux or grub depending on ISOBOOT)
+    if [ "$ISOBOOT" = "GRUB" ]; then
+        BIOS_BOOT="-boot_image grub bin_path=/boot/grub/grub_eltorito.img \
+            -boot_image grub emul_type=no_emulation \
+            -boot_image grub boot_info_table=on"
+    else
+        BIOS_BOOT="-boot_image isolinux bin_path=/isolinux/isolinux.bin \
+            -boot_image isolinux cat_path=/isolinux/boot.cat \
+            -boot_image isolinux emul_type=no_emulation \
+            -boot_image isolinux load_size=2048 \
+            -boot_image isolinux boot_info_table=on"
+    fi
+
+    # El Torito UEFI boot (if we built the ESP image)
+    if [ "$EFI_PRESENT" = "1" ]; then
+        UEFI_BOOT="-boot_image any efi_path=efi.img \
+            -boot_image any platform_id=0xef \
+            -boot_image any emul_type=no_emulation"
+    else
+        UEFI_BOOT=""
+    fi
+
+    CREATEISO_BIN="$(find_bin 'xorriso')"
+    if [ -z "$CREATEISO_BIN" ]; then
+        CREATEISO_BIN="$(find_bin 'genisoimage')"
+    fi
+
+    if [[ "$CREATEISO_BIN" =~ xorriso ]]; then
+        $CREATEISO_BIN \
+            $XORRISO_BASE \
+            $BIOS_BOOT \
+            $UEFI_BOOT \
+            -outdev "$WORKDIR/$CUSTOMISO" -blank as_needed \
+            -map "$WORKDIR/ISOTMP" / 2>>"$WORKDIR/remastersys.log" 1>>"$WORKDIR/remastersys.log"
+    else
+        # genisoimage fallback: BIOS only (no UEFI support)
+        $CREATEISO_BIN \
+            -quiet -r -V "$LIVECDLABEL" -cache-inodes -J -l -iso-level 4 -allow-limited-size \
+            -b isolinux/isolinux.bin -c isolinux/boot.cat \
+            -no-emul-boot -boot-load-size 4 -boot-info-table \
+            -o "$WORKDIR/$CUSTOMISO" "$WORKDIR/ISOTMP" 2>>"$WORKDIR/remastersys.log" 1>>"$WORKDIR/remastersys.log"
+    fi
+
+    # clean up temp EFI image
+    rm -rf "$EFI_TMP"
+
+    if [ -f "$WORKDIR/$CUSTOMISO" ]; then
+        # xorriso already produced a hybrid image (BIOS El Torito + UEFI
+        # ESP). On trixie the legacy `isohybrid` tool does not understand
+        # this layout ("invalid boot catalogue") and is no longer needed --
+        # dd/Ventoy/BalenaEtcher write the image fine as-is. Skip it.
+        :
+    fi
+
+    if [ -f $WORKDIR/$CUSTOMISO ]; then
+        cd $WORKDIR
+        
+        # create the md5 sum file, so the iso can later be tested to ensure it hasn't become corrupted
+        phrase3="$Creating $CUSTOMISO.md5 $In $WORKDIR."
+        echo -e "\n$phrase3"
+        log_msg "$phrase3"
+
+        md5sum $CUSTOMISO > $CUSTOMISO.md5
+    
+        sleep 1
+
+        echo -e $"\n$WORKDIR/$CUSTOMISO is ready to be burned or tested in a virtual machine."
+        echo -e $"\nCheck the size and if it is larger than 4GB, the USB key must be formatted in exFAT:"
+        ls -hs $WORKDIR/$CUSTOMISO
+        ls -hs $WORKDIR/$CUSTOMISO >> $WORKDIR/remastersys.log
+        echo -e $"\nIt is recommended to run \"sudo remastersys clean\" once you have burned and tested the image $CUSTOMISO.\n"
+    else
+        echo -e $"$fB$fRed\nERROR: $CUSTOMISO was not created. Read $WORKDIR/remastersys.log for more information.\n$fEND"
+    fi
+}
+
+# Check to see if either iso or cdfs options have been invoked and proceed accordingly
+case $2 in
+    iso)
+        iso $@
+        ;;
+    cdfs)
+        cdfs $@
+        ;;
+    *)
+        cdfs $@
+        iso $@
+        ;;
+esac
+
+exit 0

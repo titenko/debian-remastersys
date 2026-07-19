@@ -1,0 +1,16 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Remastersys Creator
+Name[pt_BR]=Remastersys - Criador
+GenericName=System Backup
+GenericName[pt_BR]=Backup de Sistema
+Comment=Create a backup or distro on a Live CD/DVD
+Comment[pt_BR]=Cria um backup ou distro em um Live CD/DVD
+Exec=ysudo /usr/bin/remastersys-gui
+Icon=/usr/share/icons/hicolor/128x128/apps/remastersys.png
+Terminal=false
+MultipleArgs=false
+Type=Application
+Categories=GTK;System
+NotShowIn=KDE
+X-KDE-SubstituteUID=true

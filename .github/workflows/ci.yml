@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: Shell script lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Syntax check (bash -n)
+        run: |
+          set -e
+          for f in \
+            remastersys/usr/bin/remastersys \
+            remastersys/usr/bin/remastersys-installer \
+            remastersys/usr/bin/remastersys-grubconfig \
+            remastersys/usr/bin/remastersys-skelcopy \
+            remastersys/usr/lib/remastersys/libremastersys.sh \
+            remastersys-gui/usr/bin/remastersys-gui \
+            remastersys-gui/usr/bin/remastersys-bootable-usb \
+            remastersys-gui/usr/bin/remastersys-grub-restore \
+            remastersys-gui/usr/bin/ysudo \
+            remastersys-gui/usr/lib/remastersys/libremastersysgui.sh \
+            package-creator ; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck (non-blocking)
+        run: |
+          shellcheck -S warning \
+            remastersys/usr/bin/remastersys \
+            remastersys/usr/lib/remastersys/libremastersys.sh \
+            package-creator || true

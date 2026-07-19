@@ -1,0 +1,107 @@
+#!/bin/bash
+###################################################################
+#  REMASTERSYS                                                    #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2021-2023 Daniel "Nerun" Rodrigues             #
+#    Copyright (C) 2007-2013 Tony "Fragadelic" Brijeski           #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+#    Full copyright notice: /usr/share/doc/remastersys/copyright  #
+###################################################################
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/remastersys-grubconfig.mo
+TEXTDOMAIN=remastersys-grubconfig
+
+Superuser=$"ERROR: This script must run as superuser. Try with \"sudo\"."
+
+# LIBRARIES
+. /usr/lib/remastersys/libremastersys.sh
+
+IsRoot # libremastersys.sh
+
+if [ "$1" = "help" -o "$1" = "--help" -o "$1" = "" ]; then
+    GiveUserHelp # libremastersys.sh
+fi
+
+# equal to: /mounted/location
+# sed removes "/" at end, if any
+ROOTMOUNT=$(echo "$1" | sed -e 's/\/$//g')
+
+if [ "$ROOTMOUNT" = "" ]; then
+    ROOTMOUNT="/"
+fi
+
+# equal to: /dev/sda1 or /dev/nvme0n1p5
+if [ ${ROOTMOUNT: :4} = "/dev" ]; then
+    # When user enters "remastersys-grubconfig /dev/sda1" don't need to find the
+    # device, but ROOTMOUNT (mounted location) should be finded.
+    ROOTPART=$ROOTMOUNT
+    ROOTMOUNT=$(mount | grep "$ROOTPART" | cut -d" " -f3)
+    if [ "$ROOTMOUNT" = "" ]; then
+        ROOTMOUNT=$ROOTPART
+        ROOTPART=""
+    fi
+else
+    # When user enters "/" or "/mnt", need to find the device.
+    ROOTPART=$(mount | grep " $ROOTMOUNT " | cut -d" " -f1)
+fi
+
+# Check if user is trying to restore GRUB through a Live CD or if he forgot to
+# mount partition first.
+if [ "$ROOTPART" = "overlay" -o "$ROOTPART" = "" ]; then
+    if [ "$ROOTPART" = "overlay" ]; then
+        echo -e $"$fB$fLightRed\nERROR: You cannot install or reinstall GRUB on a Live CD.$fEND"
+    elif [ "$ROOTPART" = "" ]; then
+        if [ "${ROOTMOUNT: 0:4}" = "/dev" ]; then
+            echo -e $"$fB$fLightRed\nERROR: $ROOTMOUNT is not mounted anywhere.$fEND"
+        else
+            echo -e $"$fB$fLightRed\nERROR: There is no partition mounted on $ROOTMOUNT.$fEND"
+        fi
+    fi
+
+    echo -e $"$fB$fLightRed\nTIP: You must first mount the partition on which you want to install GRUB. For\nexample, try \"sudo mount /dev/sda1 /mnt\", then run this tool again either with\n\"sudo remastersys-grubconfig /mnt\" or \"sudo remastersys-grubconfig /dev/sda1\",\nboth with the same result.\n\nQuiting now.\n$fEND"
+    sleep 20
+
+    exit 1
+fi
+
+# equal to: /dev/sda or /dev/nvme0n1
+ROOTMBR=$(echo $ROOTPART | sed -e 's/p[1-9]$\|[1-9]$//g')
+
+# equal to: root or rootmbr
+if [ "$2" = "root" ]; then
+    GRUBLOC="$ROOTPART"
+else # rootmbr
+    GRUBLOC="$ROOTMBR"
+fi
+
+echo $"Restoring GRUB to $GRUBLOC."
+
+if [ "$ROOTMOUNT" != "/" ]; then
+    if [ ! -e $ROOTMOUNT/proc/cpuinfo ]; then
+        STANDALONE="yes"
+        mount -o bind /proc $ROOTMOUNT/proc
+        mount -o bind /dev $ROOTMOUNT/dev
+        mount -o bind /sys $ROOTMOUNT/sys
+    fi
+
+    chroot $ROOTMOUNT grub-install --no-floppy $GRUBLOC
+    chroot $ROOTMOUNT update-grub
+    sync
+
+    if [ "$STANDALONE" = "yes" ]; then
+        sleep 1
+        umount $ROOTMOUNT/proc
+        sleep 1
+        umount $ROOTMOUNT/dev
+        sleep 1
+        umount $ROOTMOUNT/sys
+        sleep 1
+    fi
+else
+    grub-install --no-floppy $GRUBLOC
+    update-grub
+    sync
+fi

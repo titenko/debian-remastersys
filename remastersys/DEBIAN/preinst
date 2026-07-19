@@ -1,0 +1,32 @@
+#!/bin/sh
+# preinst script for remastersys
+#
+# see: dh_installdeb(1)
+
+set -e
+
+if [ -d /remastersys ]; then
+    mv -f /remastersys /home
+fi
+
+if [ -f /etc/remastersys.conf ]; then
+    mv -f /etc/remastersys.conf /etc/remastersys.conf.old
+fi
+
+if [ -f /etc/remastersys/isolinux/splash.png ]; then
+    mv -f /etc/remastersys/isolinux/splash.png /etc/remastersys/splash.png.saved
+fi
+
+if [ -f /etc/remastersys/isolinux/splash-default.png ]; then
+    rm -f /etc/remastersys/isolinux/splash-default.png
+fi
+
+if [ -f /etc/remastersys/grub.png ]; then
+    rm -f /etc/remastersys/grub.png
+fi
+
+if [ -f /etc/remastersys/grub-default.png ]; then
+    rm -f /etc/remastersys/grub-default.png
+fi
+
+exit 0

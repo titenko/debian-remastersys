@@ -1,0 +1,122 @@
+#!/bin/bash
+###################################################################
+#  REMASTERSYS                                                    #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2021-2023 Daniel "Nerun" Rodrigues             #
+#    Copyright (C) 2007-2013 Tony "Fragadelic" Brijeski           #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+#    Full copyright notice: /usr/share/doc/remastersys/copyright  #
+###################################################################
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/remastersys-bootable-usb.mo
+TEXTDOMAIN=remastersys-bootable-usb
+
+declare -r Pick=$"Options"
+declare -r Size=$"Size"
+declare -r Info=$"Info"
+declare -r Cancel=$"Cancel"
+declare -r Quit=$"Quiting now."
+declare -r Continue=$"\n\nClick OK to continue."
+declare -r Return=$"\n\nClick OK to return to previous menu."
+declare -r Superuser=$"ERROR: This script must run as superuser. Try with \"sudo\"."
+
+# LIBRARIES
+. /usr/lib/remastersys/libremastersysgui.sh
+
+IsRootDialog # libremastersysgui.sh
+
+TITLETEXT=$"Remastersys Bootable USB"
+
+copymenu() {
+    if [ "$1" = "(null)" -o "$1" = "" ]; then
+        $DIALOG_2$"You must select a usb key to use.$Return" --title="$TITLETEXT"
+        mainmenu
+    fi
+
+    if [ "$2" = "(null)" -o "$2" = "" ]; then
+        $DIALOG_2$"You must select a source to use.$Return" --title="$TITLETEXT"
+        mainmenu
+    fi
+
+    $DIALOG_1$"This will completely replace the contents of your usb drive\nwith the Bootable Live System.\n\nYou will not be able to undo this operation once it starts.\n\nClick OK to continue." --title="$TITLETEXT"
+
+    if [ $? != 0 ]; then
+        mainmenu
+    fi
+
+    umount $(mount | grep $1 | awk '{print $1}')
+
+    #do the copy
+    dd if=$2 of=/dev/$1 bs=1M 2>/tmp/remusbprog & pid=$!
+
+    PROGTOT=$(ls -l $2 | cut -d " " -f 5)
+    PROGPERCENT=""
+
+    while [ "$PROGPERCENT" != "100" ]; do
+        sleep 1
+        kill -USR1 $pid
+        PROGCNT=$(tail -n 1 /tmp/remusbprog | grep "(" | cut -d " " -f 1)
+
+        if [ "$PROGCNT" = "" ]; then
+            PROGPERCENT="1"
+        else
+            PROGPERCENT=$((100 * $PROGCNT / $PROGTOT))
+        fi
+
+        echo $PROGPERCENT
+        echo "#$PROGPERCENT %"
+
+    done | $DIALOG_1$"Copying to USB Key Now.\n\nPlease Wait." --title="$TITLETEXT" --no-buttons --progress --auto-close --auto-kill
+
+    rm -f /tmp/remusbprog
+    sync
+
+    $DIALOG_1$"Copy to USB key completed.$Return" --title="$TITLETEXT"
+    if [ "$?" = "0" ]; then
+        mainmenu
+    else
+        exit
+    fi
+}
+
+mainmenu() {
+    DEVS=""
+    DEVS=$(ls -l /dev/disk/by-path/*usb* | grep -v "part" | awk '{print $NF}' | awk -F "/" '{print $NF}')
+
+    if [ "$DEVS" != "" ]; then
+        for i in $DEVS; do
+            USBDRIVESIZE=$(df -h | grep "$i" | tr -s " " | cut -f2 -d" ")
+            if [ "$USBDRIVESIZE" != "" ]; then
+                USBDRIVES="$USBDRIVES!$i-$USBDRIVESIZE"
+            fi
+        done
+    fi
+    
+    if [ "$DEVS" = "" -o "$USBDRIVES" = "" ]; then
+        $DIALOG_1$"No USB Keys found.\n\nPlease insert a USB Key and then\nclick OK to return to main menu\nor Cancel to quit." --title="$TITLETEXT"
+
+        if [ "$?" = "0" ]; then
+            mainmenu
+        else
+            exit
+        fi
+    fi
+
+    ChooseUSB=$"Choose a USB Key"
+    ChooseSource=$"Choose a Source Image"
+
+    CHOICES=$($DIALOG_0 --title="$TITLETEXT" --form --field="$ChooseUSB":CB ${USBDRIVES#?} --field="$ChooseSource":FL)
+
+    if [ "$?" = "0" ]; then
+        USBDRIVE=$(echo $CHOICES | cut -d "|" -f 1 | cut -d "-" -f 1)
+        PICKSOURCE=$(echo $CHOICES | cut -d "|" -f 2)
+        copymenu $USBDRIVE $PICKSOURCE
+    else
+        exit
+    fi
+}
+
+mainmenu

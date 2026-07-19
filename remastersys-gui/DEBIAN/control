@@ -1,0 +1,11 @@
+Package: remastersys-gui
+Priority: extra
+Section: system
+Installed-Size: 348
+Maintainer: Daniel Dias Rodrigues <danieldiasr@gmail.com>
+Architecture: all
+Version: 5.0-1
+Depends: gparted, read-edid, remastersys (>= 5.0-1), xterm, yad
+Homepage: https://github.com/nerun/remastersys
+Description: Remaster and create backups of the Debian system
+ This is the visual interface of Remastersys.

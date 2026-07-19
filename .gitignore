@@ -1,0 +1,25 @@
+# Build artifacts
+*.deb
+*.buildinfo
+*.changes
+
+# Generated during packaging by ./package-creator
+# (man pages and changelogs are shipped uncompressed in the repo and
+#  gzipped only at build time; md5sums/conffiles hashes are regenerated)
+*.gz
+remastersys/DEBIAN/md5sums
+remastersys-gui/DEBIAN/md5sums
+control-conffiles.tmp
+
+# Remastersys runtime work directory / output images
+ISOTMP/
+dummysys/
+*.iso
+*.iso.md5
+
+# Editor / OS cruft
+*~
+*.swp
+*.bak
+.DS_Store
+Thumbs.db

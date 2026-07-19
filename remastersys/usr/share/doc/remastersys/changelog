@@ -1,0 +1,168 @@
+remastersys (4.9-1) unstable; urgency=low
+
+    * Completely revised ISO creation process, adoppting xorriso standards instead of xorrisofs (xorriso -as mkisofs).
+    * Added support to single files larger than 4 GiB.
+    * Added 'Settings Integrity Check' function.
+    * Updated settings, messages and translations.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Sun, 26 Feb 2023 12:36:33 -0300
+
+remastersys (4.8-1) unstable; urgency=low
+
+    * Small improvements to remastersys taken from PinguyBuilder. Also fixed error message "unary operator expected".
+    * Updated remastersys-skelcopy to exclude Gnome3 keyring folder location, google-chrome and gcalendar from config files.
+    * Updated copyright in all scripts.
+    * Updated dependencies:
+        * xorriso is preferable to genisoimage;
+        * remove live-config-sysvinit (just used by Devuan);
+        * added syslinux-common and syslinux-efi;
+    * ISO9660 version 2 support (images > 4 GiB).
+    * xorrisofs is now the first option to create image, then script looks for genisoimage.
+    * Updated functions in remastersys-installer and libremastersys.
+    * Romoved duplicate bootloader images, updating all script files and translations as needed.
+    * Updated configuration: GRUB is preferable to ISOLINUX.
+    * Fixed memtest86+ not working when Live CD is created using GRUB instead of ISOLINUX.
+    * Updated and revised GRUB menu entries and options, added internationalization.
+    * KNOWN BUGS: "fail safe" is not working.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Tue, 21 Feb 2023 22:02:05 -0300
+
+remastersys (4.7-1) unstable; urgency=low
+
+    * Fixed aliases to "install", "grub" and "skelcopy" not working in terminal. Actually I included the aliases in the help file but I forgot to insert them in the program.
+    * Fixed a few error messages in "remastersys-skelcopy" (missing files). They are now ignored.
+    * Help files rewritten and simplified. All complexity has been moved to manual pages. Manual pages was also rewritten and translated to pt_BR.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Thu, 16 Feb 2023 14:25:04 -0300
+
+remastersys (4.6-1) unstable; urgency=low
+
+    * Changed message about image size: CDs/DVDs are no longer used. Images larger than 4GB need to be burned in exFAT USB keys.
+    * Updated translation pt_BR.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Sun, 12 Feb 2023 14:19:50 -0300
+
+remastersys (4.5-1) unstable; urgency=low
+
+    * Fixed HOME folder was not copied in backup mode.
+    * Fixed LightDM doesn't login in backup mode.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Sat, 31 Dec 2022 16:54:57 -0300
+
+remastersys (4.4-1) unstable; urgency=low
+
+    * Added unified help for remastersys package.
+    * Code cleanup and some optimizations.
+    * Fixed LightDM autologin not working in Dist mode.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Fri, 23 Dec 2022 16:35:22 -0300
+
+remastersys (4.3-1) unstable; urgency=low
+
+    * More fixes to grubconfig.
+    * Fixed autologin not working on Live CD.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Thu, 29 Sep 2022 17:48:14 -0300
+
+remastersys (4.2-1) unstable; urgency=low
+
+    * remastersys-skelcopy: fixed /etc/skel backup. Added "clear" option.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Wed, 28 Sep 2022 16:24:34 -0300
+
+remastersys (4.1-1) unstable; urgency=low
+
+    * Installer: ext4 filesystem is now default.
+    * grubconfig: it's now working. Also updated pt_BR translation and help information. Added some error messages with instructions.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Wed, 28 Sep 2022 13:48:18 -0300
+
+remastersys (4.0-1) unstable; urgency=low
+
+    * Full internationalization (scripts, menu entries and desktop files). Easy to create locales for other languages with Poedit. Defaults to English, but Brazilian Portuguese is also available.
+    * All scripts have been revised, adding several improvements to source code, including more readable formatting, increased performance, various bug fixes, visual improvements of terminal messages and code optimization.
+    * Updated versions of Isolinux (4.02 > 6.04) and Memtest86 (4.00 > 4.3.7). Also added Memtest86+ v6.00-beta3 to Live CD.
+    * Changed makesquashfs' compression method from gzip to zstd. Zstd generates images up to 10% smaller in almost half the time.
+    * Updated icons and images.
+    * Improved man pages.
+    * Removed plymouth, but can be reinserted it in the future.
+    * Changed gksu/gksudo to sudo.
+    * Dependencies updated.
+
+ -- Daniel Dias Rodrigues <danieldiasr@gmail.com>  Fri, 23 Sep 2022 17:20:40 -0300
+
+remastersys (3.0.0-1) unstable; urgency=low
+
+    * Added remastersys-gtk gui into the main remastersys package - changes and fixes as well
+    * Added plymouth theme generation
+    * Added grub background changing option
+    * Added live system menu background changing option
+    * Added option for Backup mode Install Icon
+    * Optimized stage 1 procedure
+    * Fixed vesamenu.32 call
+    * Removed ubiquity-frontend* from desktop manifest so it is removed after install and off original system so it doesn't have a bad menu item
+    * Added /etc/shadow and /etc/gshadow to fix the rescue boot mode issue with root access
+    * Added remastersys-skelcopy script
+    * Prevent unimportant failures from showing to the user
+    * Added more information to the remastersys.log
+    * Properly spaced the script out to make it easier to read for scripters
+    * Added check for working folder filesystem type as it has to be a valid linux filesystem
+
+ -- Tony Brijeski <tb6517@yahoo.com>  Sat, 02 Jan 2012 05:11:00 -0500
+
+remastersys (2.0.24-1) unstable; urgency=low
+
+    * fixed some code anomalies and leftovers
+    * changed fstab mounting to be by dev instead of uuid due to uuid bugs
+    * fixed some code for omissions
+    * added localization setup in the installer
+
+ -- Tony Brijeski <tb6517@yahoo.com>  Sat, 03 Jan 2009 02:33:53 -0500
+
+remastersys (2.0.23-1) unstable; urgency=low
+
+    * Fixed the installer list dialogs so users have to choose an option since not choosing an option is pointless
+    * Changed the installer dialogs to be dynamically sized for all but the list dialogs
+    * Fixed the issue with fstab when installing from usb as the cdrom was not correctly identified
+    * Added a noformat option for /home partition setup as requested
+    * Added a config file /etc/remastersys/remastersys-installer.conf where the DEFAULTGROUPS for the installer's user creation can be customized
+    * Added the usb creator tool
+    * Added the nomodeset radeon.modeset=0 nouveau.modeset=0 to the failsafe boot option for live.cfg
+    * Changed the default timeout to 10 seconds for live auto start
+
+ -- Tony Brijeski <tb6517@yahoo.com>
+
+remastersys (2.0.22-1) unstable; urgency=low
+
+    * Fixed isohybrid code to actually make the iso a hybrid one
+    * Added Extra question for the Time Setting in the installer for setting UTC in /etc/default/rcS
+
+ -- Tony Brijeski <tb6517@yahoo.com>
+
+remastersys (2.0.21-1) unstable; urgency=low
+
+    * Fixed leftover live config issue with thanks to AnthLee of SalineOS for the fix
+    * Fixed installer home partition issue
+    * Fixed grub restore issue and grub install issue
+    * Added slim.conf cleanup for installer
+    * Added lxdm config cleanup for installer
+    * Fixed gdm and gdm live issue and cleanup for live with thanks to Gmaq of AVLinux for the request
+    * Added a fix for a Thunar volmanrc problem for backup mode with thanks to AnthLee of SalineOS for the request
+    * Added better information to the remastersys.log output
+    * Added code to make the iso file a hybrid iso that can used as an image for usb or normal iso for optical media
+    * Created Timezone config within the installer so it doesn't just use a dpkg-reconfigure tzdata which makes it better for gui    
+
+ -- Tony Brijeski <tb6517@yahoo.com>
+
+remastersys (2.0.20-1) unstable; urgency=low
+
+    * New Version for Squeeze
+    * Updated the installer to include an option for ext3 or ext4 filesystems
+    * updated remastersys-grubconfig for grub-pc
+    * updated isolinux boot config
+    * modified deps due to new live packages in squeeze
+
+    * First release.
+
+ -- Tony Brijeski <tb6517@yahoo.com>
+

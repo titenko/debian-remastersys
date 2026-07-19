@@ -1,0 +1,92 @@
+#!/bin/bash
+###################################################################
+#  REMASTERSYS                                                    #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2021-2023 Daniel "Nerun" Rodrigues             #
+#    Copyright (C) 2007-2013 Tony "Fragadelic" Brijeski           #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+#    Full copyright notice: /usr/share/doc/remastersys/copyright  #
+###################################################################
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/remastersys-skelcopy.mo
+TEXTDOMAIN=remastersys-skelcopy
+
+Superuser=$"ERROR: This script must run as superuser. Try with \"sudo\"."
+
+# LIBRARIES
+. /usr/lib/remastersys/libremastersys.sh
+
+IsRoot # libremastersys.sh
+
+backupSkel(){
+    # delete skel-backup folder if empty
+    rmdir --ignore-fail-on-non-empty /etc/remastersys/skel-backup
+    # if fail to delete, it's not empty and there's already a backup
+    
+    if [ ! -d /etc/remastersys/skel-backup ]; then
+        mkdir -p /etc/remastersys/skel-backup
+        # -T do not includes the directory itself, but copy all it's contents
+        cp -rT /etc/skel /etc/remastersys/skel-backup
+    fi
+}
+
+if [ "$1" = "help" -o "$1" = "--help" -o "$1" = "" ]; then
+    GiveUserHelp # libremastersys.sh
+elif [ "$1" = "clear" ]; then
+    # First: make a backup of Debian original files if there is no backup
+    backupSkel
+    
+    # Second: clear skel
+    # {*,.[^.]*} means all files and directories, hidden or not
+    # [^.] excludes directories "." and ".."
+    rm -rf /etc/skel/{*,.[^.]*}
+    
+    # Third: if there is a backup of Debian original files, restore it
+    if [ -d /etc/remastersys/skel-backup ]; then
+        cp -rT /etc/remastersys/skel-backup /etc/skel/
+        rm -rf /etc/remastersys/skel-backup
+    fi
+else
+    SKELUSER="$1"
+
+    SKELFOLDER=$(grep "^$SKELUSER:" /etc/passwd | awk -F ":" '{print $6}')
+
+    if [ -d "$SKELFOLDER" ]; then
+        echo $"Creating a backup of the standard system files in the /etc/skel directory."
+        backupSkel
+        echo $"Cleaning up /etc/skel."
+        rm -rf /etc/skel/{*,.[^.]*}
+        cd $SKELFOLDER
+        echo $"Copying config files to /etc/skel."
+        rsync -a \
+            --exclude={'.cache','.steam','.wine'} \
+            --ignore-missing-args \
+            .* /etc/skel/
+        echo $"Deleting unwanted files in /etc/skel."
+        [ -f /etc/skel/.config/libreoffice/4/user/registrymodifications.xcu ] && sed -i -e 's/<item.*HistoryInfo.*item>//g' /etc/skel/.config/libreoffice/4/user/registrymodifications.xcu
+        [ -f /etc/skel/.xscreensaver ] && sed -i -e "s/$SKELUSER//g" /etc/skel/.xscreensaver
+        find /etc/skel/ | grep "$SKELUSER" | xargs rm -rf '{}'
+        find /etc/skel/ -name "*cache*" | xargs rm -rf '{}'
+        find /etc/skel/ -name "*socket*" | xargs rm -rf '{}'
+        find /etc/skel/ -type d -name "keyrings" | xargs rm -rf '{}'
+        find /etc/skel/ -type f -maxdepth 1 -name "*history*"
+        find /etc/skel/ -type f -name "*.log"
+        grep -Rl "$SKELUSER" /etc/skel | xargs rm -rf '{}'
+        rm -f /etc/skel/.git*
+        rm -f /etc/skel/.local/share/applications/wine-*
+        rm -f /etc/skel/.local/share/recently-used.xbel
+        rm -f /etc/skel/.xsession-errors*
+        rm -rf /etc/skel/.config/gcalendar        
+        rm -rf /etc/skel/.local/share/RecentDocuments/*
+        rm -rf /etc/skel/.local/share/Trash
+        echo $"Setting ownership of files in /etc/skel to root."
+        chown -R root:root /etc/skel
+    else
+        echo $"$1 either not found or doesn't have a proper home folder. Exiting."
+        exit 1
+    fi
+fi
+

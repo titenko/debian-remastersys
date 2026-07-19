@@ -1,0 +1,105 @@
+#!/bin/bash
+###################################################################
+#  REMASTERSYS                                                    #
+#    Under the GNU GPL2 License                                   #
+#    Copyright (C) 2021-2023 Daniel "Nerun" Rodrigues             #
+#    Copyright (C) 2007-2013 Tony "Fragadelic" Brijeski           #
+#    Copyright (C) 2026 Maksym "Mative" Titenko                   #
+#    <titenko.m@gmail.com>                                       #
+#    Full copyright notice: /usr/share/doc/remastersys/copyright  #
+###################################################################
+
+# The remastersys-grub-restore was completely rewritten in September 2022.
+
+# SYSTEM LOCALIZATION
+# Target to file:
+# /usr/share/locale/(language code)/LC_MESSAGES/remastersys-grub-restore.mo
+TEXTDOMAIN=remastersys-grub-restore
+
+declare -r Pick=$"Options"
+declare -r Size=$"Size"
+declare -r Info=$"Info"
+declare -r Cancel=$"Cancel"
+declare -r Quit=$"Quiting now."
+declare -r Continue=$"\n\nClick OK to continue."
+declare -r Return=$"\n\nClick OK to return to previous menu."
+declare -r Superuser=$"ERROR: This script must run as superuser. Try with \"sudo\"."
+
+# LIBRARIES
+. /usr/lib/remastersys/libremastersysgui.sh
+
+IsRootDialog # libremastersysgui.sh
+
+TITLETEXT=$"Remastersys Grub Restore"
+
+# inform them what this is and ask if they want to continue
+$DIALOG_1_nf$"This is a GRUB restore utility.$Continue" --width=310 --title="$TITLETEXT"
+QuitNow "$TITLETEXT"
+
+# START ########################################################################
+
+MyRoot=$(mount | grep " / " | cut -d' ' -f1)
+
+if [ "$MyRoot" != "overlay" ]; then
+    # Running from HD
+    partition_info=$"The_partition_this_install_is_on"
+    partitions_list="$MyRoot $(sudo fdisk -l | grep "$MyRoot" | sed 's/\*//' | tr -s " " | cut -d' ' -f5) $partition_info"
+else
+    # Running from a LiveCD
+    # list mounted partitions
+    fdisk -l | grep "^/dev" | sed 's/\*//' | tr -s " " | cut -d' ' -f1,5- > tmp.sudo_fdisk
+
+    while read line; do
+        PART=$(echo $line | cut -d' ' -f1)
+        SIZE=$(echo $line | cut -d' ' -f2)
+        INFO=$(echo $line | cut -d' ' -f3- | sed 's/ /_/g')
+        partitions_list="$partitions_list $PART $SIZE $INFO"
+    done < tmp.sudo_fdisk
+    
+    rm tmp.sudo_fdisk
+fi
+
+# SELECT PARTITION #############################################################
+
+SelectPartition=$"Please select a partition to install or restore grub to.\n\nIf you see no option then no valid partitions were found. If that's the case, first try to mount the partition you want to install or restore GRUB to and then come back here."
+
+TARGETPART=$($DIALOG_1_nf"$SelectPartition" --width=500 --height=370 --title="$TITLETEXT" $MENU_1 $partitions_list)
+QuitNow "$TITLETEXT"
+
+# equal to: /dev/sda1 or /dev/nvme0n1p5
+PartitionRoot=$(echo $TARGETPART | cut -d"|" -f1)
+
+# equal to: /dev/sda or /dev/nvme0n1
+PartitionMBR=$(echo $TARGETPART | cut -d"|" -f1 | sed -e 's/p[1-9]$\|[1-9]$//g')
+
+# SELECT ROOT OR ROOTMBR #######################################################
+
+WhereGrub=$"Where do you want to install GRUB to?"
+root=$"root partition ($PartitionRoot)"
+rootmbr=$"Master Boot Record (MBR) of $PartitionMBR"
+
+# root|root partition (/dev/sda1)|
+# rootmbr|Master Boot Record (MBR) of /dev/sda|
+WHEREGRUB=$($DIALOG_1_nf"$WhereGrub" --width=400 --title="$TITLETEXT" $MENU "rootmbr" "$rootmbr" "root" "$root")
+QuitNow "$TITLETEXT"
+
+# root
+# rootmbr
+WHEREGRUBa=$(echo $WHEREGRUB | cut -d"|" -f1)
+# root partition (/dev/sda1)
+# Master Boot Record (MBR) of /dev/sda
+WHEREGRUBb=$(echo $WHEREGRUB | cut -d"|" -f2)
+
+# ADVISE - PROCEED TO INSTALL OR CANCEL ########################################
+
+proceed=$"GRUB will be restored to:\n\n$WHEREGRUBb$Continue"
+
+$DIALOG_1_nf"$proceed" --width=400 --title="$TITLETEXT"
+QuitNow "$TITLETEXT"
+
+if [ "$PartitionRoot" = "$MyRoot" ]; then
+    PartitionRoot="/"
+fi
+
+xterm -fn 9x15 -e "sudo remastersys-grubconfig $PartitionRoot $WHEREGRUBa"
+
